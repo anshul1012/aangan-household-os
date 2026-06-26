@@ -1,0 +1,34 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.Python
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Database / backups (durable state lives off-box, not in the working tree)
+*.sql
+*.dump
+pgdata/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
