@@ -32,3 +32,4 @@ pgdata/
 *.swp
 .idea/
 .vscode/
+*.iml
