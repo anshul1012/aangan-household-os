@@ -57,6 +57,7 @@ class ExpensesHandler(BaseHandler):
             expense = _to_expense(parsed, message)
             expense_id = await insert_expense(expense)
             logger.info("Saved expense id=%s: %s", expense_id, expense)
+            await message.add_reaction("✅")
         else:
             logger.info(
                 "Confidence=%s — clarification needed: %s",
