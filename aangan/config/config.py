@@ -27,7 +27,7 @@ def load_config() -> Config:
         return val
 
     return Config(
-        bot_token=require("bot_token"),
+        bot_token=require("BOT_TOKEN"),
         gemini_api_key=require("GEMINI_API_KEY"),
         db_user=require("POSTGRES_USER"),
         db_password=require("POSTGRES_PASSWORD"),
