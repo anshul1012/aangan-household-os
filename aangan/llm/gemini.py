@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 _client: genai.Client | None = None
-_model: str = "gemini-2.0-flash"
+_model: str = "gemini-3.1-flash-lite"
 
 
-def init_gemini(api_key: str, model: str = "gemini-2.0-flash") -> None:
+def init_gemini(api_key: str, model: str = "gemini-3.1-flash-lite") -> None:
     global _client, _model
     _client = genai.Client(api_key=api_key)
     _model = model
