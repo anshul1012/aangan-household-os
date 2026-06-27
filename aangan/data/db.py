@@ -11,6 +11,7 @@ from pathlib import Path
 import asyncpg
 
 from aangan.config.config import Config
+from aangan.data.models import Expense
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,26 @@ async def close_db() -> None:
         await _pool.close()
         _pool = None
         logger.info("Database pool closed.")
+
+
+async def insert_expense(expense: Expense) -> int:
+    """Insert one expense row and return its generated id."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO expenses
+                (amount, currency, category, tags, payer_person, payer_account,
+                 occurred_on, raw_text, source, confidence, status)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            RETURNING id
+            """,
+            expense.amount, expense.currency, expense.category,
+            expense.tags, expense.payer_person, expense.payer_account,
+            expense.occurred_on, expense.raw_text, expense.source,
+            expense.confidence, expense.status,
+        )
+        return row["id"]
 
 
 async def _run_migrations(pool: asyncpg.Pool) -> None:
