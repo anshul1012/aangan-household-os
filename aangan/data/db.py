@@ -10,13 +10,13 @@ from pathlib import Path
 
 import asyncpg
 
-from aangan.config import Config
+from aangan.config.config import Config
 
 logger = logging.getLogger(__name__)
 
 _pool: asyncpg.Pool | None = None
 
-_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migrations"
+_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "db" / "migrations"
 
 
 async def init_db(config: Config) -> None:

@@ -1,4 +1,4 @@
-"""Dev channel handler.
+"""Expenses channel handler.
 
 For now it just logs every message it receives — a smoke test that the
 gateway connection, intents, and routing are all wired correctly.
@@ -13,8 +13,8 @@ from aangan.channels.base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class DevHandler(BaseHandler):
-    CHANNEL_NAME = "dev"
+class ExpensesHandler(BaseHandler):
+    CHANNEL_NAME = "expenses"
 
     async def handle_message(self, message: discord.Message) -> None:
         logger.info(

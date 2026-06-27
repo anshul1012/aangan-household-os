@@ -7,19 +7,18 @@ those modules. Register new channels here as their modules are added.
 """
 
 import logging
-from typing import Awaitable, Callable
 
 import discord
 
-from aangan.channels.dev import handler as dev_handler
+from aangan.channels.base import BaseHandler
+from aangan.channels.dev.handler import DevHandler
+from aangan.channels.expenses.handler import ExpensesHandler
 
 logger = logging.getLogger(__name__)
 
-Handler = Callable[[discord.Message], Awaitable[None]]
-
-# channel name -> handler coroutine
-_HANDLERS: dict[str, Handler] = {
-    dev_handler.CHANNEL_NAME: dev_handler.handle,
+_HANDLERS: dict[str, BaseHandler] = {
+    DevHandler.CHANNEL_NAME: DevHandler(),
+    ExpensesHandler.CHANNEL_NAME: ExpensesHandler(),
 }
 
 
@@ -29,4 +28,4 @@ async def route(message: discord.Message) -> None:
     if handler is None:
         # Message from a channel we don't handle (or a DM) — ignore silently.
         return
-    await handler(message)
+    await handler.handle(message)
