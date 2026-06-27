@@ -9,7 +9,7 @@ import logging
 
 import discord
 
-from aangan.router import route
+from aangan.router.router import route
 
 logger = logging.getLogger(__name__)
 

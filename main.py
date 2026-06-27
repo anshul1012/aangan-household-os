@@ -11,12 +11,14 @@ from dotenv import load_dotenv
 
 from aangan.bot import create_client
 from aangan.config import load_config
-from aangan.db import close_db, init_db
+from aangan.data import close_db, init_db
+from aangan.llm import init_gemini
 
 
 async def _run() -> None:
     config = load_config()
     await init_db(config)
+    init_gemini(config.gemini_api_key, config.gemini_model)
     client = create_client()
     try:
         # log_handler=None: let our basicConfig own logging rather than discord.py's.
