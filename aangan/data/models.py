@@ -7,16 +7,9 @@ are the typed currency passed between db.py and the rest of the application.
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
-
-
-class EntryType(StrEnum):
-    EXPENSE = "expense"
-    INCOME = "income"
-    INVESTMENT = "investment"
-    TRANSFER = "transfer"
 
 
 class ExpenseCategory(StrEnum):
@@ -44,14 +37,14 @@ class MessageSource(StrEnum):
     VOICE = "voice"
 
 
-class EntryStatus(StrEnum):
+class ExpenseStatus(StrEnum):
     CONFIRMED = "confirmed"
     PENDING = "pending"
     AUTO = "auto"
 
 
 @dataclass
-class Entry:
+class Expense:
     amount: Decimal
     category: str                          # one of ExpenseCategory; TEXT in DB
     payer_person: str
@@ -59,13 +52,12 @@ class Entry:
     occurred_on: datetime.date
     id: int | None = None
     currency: str = "INR"
-    type: EntryType = EntryType.EXPENSE
     tags: list[str] | None = None          # optional drill-down e.g. ["Swiggy"]
     payer_account: str | None = None
     logged_at: datetime.datetime | None = None
     source: MessageSource = MessageSource.TEXT
-    confidence: float | None = None
-    status: EntryStatus = EntryStatus.PENDING
+    confidence: str | None = None          # one of ConfidenceLevel values; TEXT in DB
+    status: ExpenseStatus = ExpenseStatus.PENDING
 
 
 @dataclass

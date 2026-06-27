@@ -10,7 +10,7 @@ import logging
 import discord
 
 from aangan.channels.base import BaseHandler
-from aangan.channels.expenses.parsed_entries import ParsedEntry
+from aangan.channels.expenses.parsed_entries import ParsedExpense
 from aangan.channels.expenses.prompts import build_expense_parse_prompt
 from aangan.llm import generate_json
 
@@ -33,5 +33,5 @@ class DevHandler(BaseHandler):
             sender=message.author.display_name,
             today=datetime.date.today(),
         )
-        parsed = await generate_json(prompt, ParsedEntry)
+        parsed = await generate_json(prompt, ParsedExpense)
         logger.info("Parsed: %s", parsed)

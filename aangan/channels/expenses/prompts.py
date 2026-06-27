@@ -35,7 +35,19 @@ def build_expense_parse_prompt(message: str, sender: str, today: datetime.date) 
           Default to today if no date is mentioned.
         - tags: list any specific vendor or app names mentioned
           (e.g. "Swiggy", "Blinkit", "Instamart", "Zepto", "Amazon"). Null if none.
-        - confidence: your certainty across all fields (0.0 = guessing, 1.0 = certain).
+        - confidence: your certainty across all fields. Return exactly one of: "high", "mid", "low".
+          high = amount clear, category certain, date unambiguous, payer obvious, tags (if any) clearly identified.
+          mid  = amount clear but one field is inferred or ambiguous (category guessed, date defaulted
+                 without being stated, payer assumed as sender, tags uncertain).
+          low  = amount missing or unclear, or two or more fields are uncertain or unresolvable.
+        - clarification_question: null if confidence is "high".
+          For "mid" or "low", return a short, specific question targeting the single most
+          uncertain field. Ask about one thing only — do not ask the user to repeat the whole message.
+          Examples:
+            amount unclear   → "How much was this?"
+            category unclear → "What's this for — Housing, Transport, or something else?"
+            payer unclear    → "Who paid for this?"
+          Keep it conversational, under 15 words.
 
         ## Message
         {message}
