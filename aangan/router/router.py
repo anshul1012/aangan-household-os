@@ -23,9 +23,17 @@ _HANDLERS: dict[str, BaseHandler] = {
 
 
 async def route(message: discord.Message) -> None:
-    channel_name = getattr(message.channel, "name", None)
-    handler = _HANDLERS.get(channel_name)
-    if handler is None:
-        # Message from a channel we don't handle (or a DM) — ignore silently.
-        return
-    await handler.handle(message)
+    channel = message.channel
+    if isinstance(channel, discord.Thread):
+        channel_name = getattr(channel.parent, "name", None)
+        handler = _HANDLERS.get(channel_name)
+        if handler is None:
+            return
+        await handler.handle_in_thread(message)
+    else:
+        channel_name = getattr(channel, "name", None)
+        handler = _HANDLERS.get(channel_name)
+        if handler is None:
+            # Message from a channel we don't handle (or a DM) — ignore silently.
+            return
+        await handler.handle(message)
