@@ -20,7 +20,7 @@ def create_client() -> discord.Client:
     # read freeform text (and, later, voice attachments) rather than only
     # slash-command arguments.
     intents = discord.Intents.default()
-    intents.message_content = True
+    intents.__setattr__('message_content', True)
 
     client = discord.Client(intents=intents)
 
