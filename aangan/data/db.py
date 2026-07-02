@@ -45,22 +45,36 @@ async def close_db() -> None:
         logger.info("Database pool closed.")
 
 
-async def insert_expense(expense: Expense) -> int:
-    """Insert one expense row and return its generated id."""
+async def upsert_expense(expense: Expense) -> int:
+    """Insert a new expense, or update the existing row sharing the same
+    source_message_id (a thread reply refining an earlier MEDIUM-confidence
+    guess). logged_at is deliberately excluded from the UPDATE SET list so it
+    always reflects the original log time, not the latest refinement."""
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
             INSERT INTO expenses
                 (amount, currency, category, tags, payer_person, payer_account,
-                 occurred_on, raw_text, source, confidence, status)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                 occurred_on, raw_text, source, confidence, status, source_message_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            ON CONFLICT (source_message_id) WHERE source_message_id IS NOT NULL
+            DO UPDATE SET
+                amount = EXCLUDED.amount,
+                category = EXCLUDED.category,
+                tags = EXCLUDED.tags,
+                payer_person = EXCLUDED.payer_person,
+                payer_account = EXCLUDED.payer_account,
+                occurred_on = EXCLUDED.occurred_on,
+                raw_text = EXCLUDED.raw_text,
+                confidence = EXCLUDED.confidence,
+                status = EXCLUDED.status
             RETURNING id
             """,
             expense.amount, expense.currency, expense.category,
             expense.tags, expense.payer_person, expense.payer_account,
             expense.occurred_on, expense.raw_text, expense.source,
-            expense.confidence, expense.status,
+            expense.confidence, expense.status, expense.source_message_id,
         )
         return row["id"]
 

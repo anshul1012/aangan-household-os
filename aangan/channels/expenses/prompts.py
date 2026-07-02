@@ -43,18 +43,20 @@ def build_expense_parse_prompt(message: str, sender: str, today: datetime.date) 
 
         {shared}
         - confidence: your certainty across all fields. Return exactly one of: "high", "mid", "low".
-          high = amount clear, category certain, date unambiguous, payer obvious, tags (if any) clearly identified.
-          mid  = amount clear but one field is inferred or ambiguous (category guessed, date defaulted
-                 without being stated, payer assumed as sender, tags uncertain).
-          low  = amount missing or unclear, or two or more fields are uncertain or unresolvable.
+          high = amount AND category both certain, AND date, payer, and tags (if any) are all
+                 confidently resolved — nothing guessed or defaulted.
+          mid  = amount AND category both confidently extracted, but at least one of date, payer,
+                 or tags is inferred, defaulted, or ambiguous.
+          low  = amount OR category cannot be confidently extracted — this takes priority over
+                 every other field. If either is uncertain, return "low" even if everything else is clear.
         - clarification_question: null if confidence is "high".
-          For "mid" or "low", return a short, specific question targeting the single most
-          uncertain field. Ask about one thing only — do not ask the user to repeat the whole message.
-          Examples:
-            amount unclear   → "How much was this?"
-            category unclear → "What's this for — Housing, Transport, or something else?"
-            payer unclear    → "Who paid for this?"
-          Keep it conversational, under 15 words.
+          For "mid": state the assumed/defaulted values plainly and ask for a single-reply
+          confirm-or-correct, e.g. "Logged as Help/Services, paid by you, dated today — right?
+          Reply to fix anything, or just say 'yep'." Surface every field that was guessed or
+          defaulted, not just one — the user should be able to fix everything in one reply.
+          For "low": ask a short, specific question targeting the single most uncertain field
+          (amount or category) — nothing has been saved yet, so keep it narrow and simple.
+          Keep "mid" under 25 words; keep "low" under 15 words.
 
         ## Message
         {message}
@@ -76,10 +78,16 @@ def build_thread_parse_prompt(
 
         {shared}
         - confidence: your certainty across all fields. Return exactly one of: "high", "mid", "low".
-          high = all fields resolved clearly from the conversation.
-          mid  = amount clear but one field still ambiguous.
-          low  = amount still missing or unclear.
-        - clarification_question: null if confidence is "high". Otherwise a short follow-up question.
+          high = amount, category, date, payer, and tags are all resolved clearly from the conversation.
+          mid  = amount and category are both clear, but at least one other field is still ambiguous.
+          low  = amount or category is still missing or unclear.
+        - clarification_question: null if confidence is "high".
+          For "mid": state the assumed/defaulted values plainly and ask for a single-reply
+          confirm-or-correct — surface every field that was guessed or defaulted, not just one,
+          so the user can fix everything in one reply.
+          For "low": ask a short, specific question targeting the single most uncertain field
+          (amount or category) — nothing has been saved yet, so keep it narrow and simple.
+          Keep "mid" under 25 words; keep "low" under 15 words.
 
         ## Conversation
         {conversation}

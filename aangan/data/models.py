@@ -58,6 +58,7 @@ class Expense:
     source: MessageSource = MessageSource.TEXT
     confidence: str | None = None          # one of ConfidenceLevel values; TEXT in DB
     status: ExpenseStatus = ExpenseStatus.PENDING
+    source_message_id: int | None = None   # Discord message id that created/refines this row
 
 
 @dataclass
