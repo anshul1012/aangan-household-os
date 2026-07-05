@@ -33,3 +33,6 @@ pgdata/
 .idea/
 .vscode/
 *.iml
+
+# Specs
+CLAUDE.md
