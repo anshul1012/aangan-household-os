@@ -81,7 +81,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Secrets in `.env` are injected as env vars at runtime via `env_file:` — the file is never copied into the image. On the production VM, place `.env` manually after provisioning (`chmod 600 .env`).
+Secrets in `.env` are injected as env vars at runtime via `env_file:` — the file is never copied into the image. This is the **dev** setup (local Postgres in a container); see below for prod.
 
 To stop and tear down:
 
@@ -89,3 +89,18 @@ To stop and tear down:
 docker compose down        # stops containers, keeps the pgdata volume
 docker compose down -v     # also deletes the volume (wipes the database)
 ```
+
+---
+
+## Running in production
+
+Prod uses a hosted Supabase Postgres project instead of a local container — there's no `db` service to run.
+
+```bash
+cp .env.prod.example .env.prod
+# fill in BOT_TOKEN, GEMINI_API_KEY, and DATABASE_URL (Supabase Session Pooler connection string)
+
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+Place `.env.prod` manually on the host after provisioning (`chmod 600 .env.prod`), same as dev's `.env` — it's gitignored and never baked into the image.

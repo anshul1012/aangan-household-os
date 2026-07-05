@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # Python
 __pycache__/
@@ -23,7 +24,9 @@ env/
 htmlcov/
 
 # Database / backups (durable state lives off-box, not in the working tree)
+# NOTE: this must not catch db/migrations/*.sql — those are versioned app source, not dumps.
 *.sql
+!db/migrations/*.sql
 *.dump
 pgdata/
 
@@ -35,6 +38,7 @@ pgdata/
 *.iml
 
 #Specs
+CLAUDE.md
 vision.md
 spec.md
 tech.md
