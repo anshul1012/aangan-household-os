@@ -9,7 +9,7 @@ import logging
 
 import discord
 
-from aangan.router import route
+from aangan.router.router import route
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ def create_client() -> discord.Client:
     # read freeform text (and, later, voice attachments) rather than only
     # slash-command arguments.
     intents = discord.Intents.default()
-    intents.message_content = True
+    intents.__setattr__('message_content', True)
 
     client = discord.Client(intents=intents)
 
