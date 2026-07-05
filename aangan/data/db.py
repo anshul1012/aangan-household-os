@@ -22,12 +22,15 @@ _MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "db" / "migrat
 
 async def init_db(config: Config) -> None:
     global _pool
-    dsn = (
+    dsn = config.database_url or (
         f"postgresql://{config.db_user}:{config.db_password}"
         f"@{config.db_host}/{config.db_name}"
     )
-    _pool = await asyncpg.create_pool(dsn=dsn)
-    logger.info("Database pool ready (host=%s db=%s)", config.db_host, config.db_name)
+    _pool = await asyncpg.create_pool(dsn=dsn, min_size=1, max_size=3)
+    logger.info(
+        "Database pool ready (%s)",
+        "via DATABASE_URL" if config.database_url else f"host={config.db_host} db={config.db_name}",
+    )
     await _run_migrations(_pool)
 
 

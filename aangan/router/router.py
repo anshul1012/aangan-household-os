@@ -12,6 +12,7 @@ import discord
 
 from aangan.channels.base import BaseHandler
 from aangan.channels.expenses.handler import ExpensesHandler
+from aangan.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +20,30 @@ _HANDLERS: dict[str, BaseHandler] = {
     ExpensesHandler.CHANNEL_NAME: ExpensesHandler(),
 }
 
+# Real Discord channel IDs this bot instance is allowed to react in, set at startup
+# from config.
+_allowed_channel_ids: frozenset[int] = frozenset()
+
+def init_router(config: Config) -> None:
+    global _allowed_channel_ids
+    _allowed_channel_ids = config.allowed_channel_ids
 
 async def route(message: discord.Message) -> None:
     channel = message.channel
     server = getattr(message.guild, "name", "DM")
-    if isinstance(channel, discord.Thread):
-        channel_name = getattr(channel.parent, "name", None)
-        handler = _HANDLERS.get(channel_name)
-        if handler is None:
-            return
+    in_thread = isinstance(channel, discord.Thread)
+    parent = channel.parent if in_thread else channel
+    channel_name = getattr(parent, "name", "None")
+
+    if parent.id not in _allowed_channel_ids:
+        return
+    handler = _HANDLERS.get(channel_name)
+    if handler is None:
+        return
+
+    if in_thread:
         logger.info("[%s][#%s][thread:%s] %s: %s", server, channel_name, channel.name, message.author.display_name, message.content)
         await handler.handle_in_thread(message)
     else:
-        channel_name = getattr(channel, "name", None)
-        handler = _HANDLERS.get(channel_name)
-        if handler is None:
-            return
         logger.info("[%s][#%s] %s: %s", server, channel_name, message.author.display_name, message.content)
         await handler.handle(message)
