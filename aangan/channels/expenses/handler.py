@@ -15,6 +15,7 @@ confidence improves, until it reaches HIGH or the clarification round cap.
 import datetime
 import logging
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import discord
 
@@ -32,6 +33,15 @@ _THREAD_HISTORY_FETCH_LIMIT = 50  # Discord history page size; independent of th
 
 _VALID_CATEGORIES = {c.value for c in ExpenseCategory}
 _CATEGORY_LIST = ", ".join(c.value for c in ExpenseCategory)
+
+# The household is IST-based; "today" must resolve to the household's local
+# calendar date regardless of the container's own timezone (Docker defaults to
+# UTC), since occurred_on/"yesterday" resolution and all reports key off it.
+_HOUSEHOLD_TZ = ZoneInfo("Asia/Kolkata")
+
+
+def _today() -> datetime.date:
+    return datetime.datetime.now(_HOUSEHOLD_TZ).date()
 
 
 def _normalize_category(category: str) -> tuple[str, bool]:
@@ -106,7 +116,7 @@ class ExpensesHandler(BaseHandler):
         prompt = build_expense_parse_prompt(
             message=message.content,
             sender=message.author.display_name,
-            today=datetime.date.today(),
+            today=_today(),
         )
         logger.debug("Prompt: %s", prompt)
         parsed = await generate_json(prompt, ParsedExpense)
@@ -153,7 +163,7 @@ class ExpensesHandler(BaseHandler):
         prompt = build_thread_parse_prompt(
             thread_lines=thread_history,
             sender=message.author.display_name,
-            today=datetime.date.today(),
+            today=_today(),
         )
         logger.debug("Prompt: %s", prompt)
         parsed = await generate_json(prompt, ParsedExpense)
