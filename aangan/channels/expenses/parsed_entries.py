@@ -1,10 +1,21 @@
-"""Pydantic schema for the LLM-parsed expense entry."""
+"""Pydantic schemas for the LLM-parsed message: intent classification + expense entry."""
 
 from enum import StrEnum
 
 from pydantic import BaseModel
 
-__all__ = ["ConfidenceLevel", "ParsedExpense"]
+__all__ = ["ConfidenceLevel", "MessageIntent", "IntentClassification", "ParsedExpense"]
+
+
+class MessageIntent(StrEnum):
+    """What the sender is trying to do in the #expenses channel."""
+    EXPENSE_LOGGING = "expense_logging"   # recording money spent/returned
+    EXPENSE_QUERY = "expense_query"       # asking a question about past spending
+
+
+class IntentClassification(BaseModel):
+    intent: MessageIntent
+    reason: str | None      # one short phrase explaining the call, for debug logging only
 
 
 class ConfidenceLevel(StrEnum):

@@ -7,7 +7,39 @@ from aangan.data.models import ExpenseCategory
 
 _CATEGORIES = ", ".join(c.value for c in ExpenseCategory)
 
-__all__ = ["build_expense_parse_prompt", "build_thread_parse_prompt"]
+__all__ = ["build_intent_prompt", "build_expense_parse_prompt", "build_thread_parse_prompt"]
+
+
+def build_intent_prompt(message: str) -> str:
+    return textwrap.dedent(f"""
+        You are an expert at understanding the intent of user messages sent in a
+        shared household's expense-tracking group. Classify the message into exactly
+        one intent:
+
+        - "expense_logging": the message records money spent or returned — an expense,
+          payment, purchase, or reimbursement/refund to be logged.
+        - "expense_query": the message asks a question about *past* spending — a total,
+          breakdown, trend, ranking, or any insight about already-logged expenses.
+
+        Safety rule: if the message plausibly records an expense, or is ambiguous,
+        choose "expense_logging". Only choose "expense_query" when it is clearly asking
+        about or for past-spend information.
+
+        Examples:
+        - "1800 groceries" -> expense_logging
+        - "paid maid 4000" -> expense_logging
+        - "got back 2000 from the clothes" -> expense_logging
+        - "aditi paid 2000 medicines axis" -> expense_logging
+        - "how much did we spend on groceries last week?" -> expense_query
+        - "top spends this month" -> expense_query
+        - "show me the dining trend" -> expense_query
+        - "what's our total on Swiggy in June?" -> expense_query
+
+        Return JSON with the intent and a short reason.
+
+        ## Message
+        {message}
+    """).strip()
 
 
 def _shared_field_rules(sender: str, today: datetime.date) -> str:
