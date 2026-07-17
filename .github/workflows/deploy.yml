@@ -1,0 +1,28 @@
+name: Build check and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build .
+
+  deploy:
+    needs: build-check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: bash ~/aangan-household-os/scripts/deploy.sh
