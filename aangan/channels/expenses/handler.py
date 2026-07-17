@@ -1,6 +1,11 @@
 """Expenses channel handler.
 
-Parses each message with Gemini. Amount is the only field that can ever block
+Every message is first classified by a semantic router (logging vs querying).
+Queries route to the insights stub (the agentic pipeline isn't built yet); an
+ambiguous or failed classification degrades to logging — a dropped expense is the
+worst outcome. The rest of this module is the logging path.
+
+Parses each logged message with Gemini. Amount is the only field that can ever block
 persistence — if it's null/unparseable, nothing is saved until a thread reply
 resolves it. Category is never blocking: an unrecognized value (the model's
 "none fit", or any hallucinated ad-hoc string) is defaulted to Misc so invalid
@@ -20,8 +25,17 @@ from zoneinfo import ZoneInfo
 import discord
 
 from aangan.channels.base import BaseHandler
-from aangan.channels.expenses.parsed_entries import ConfidenceLevel, ParsedExpense
-from aangan.channels.expenses.prompts import build_expense_parse_prompt, build_thread_parse_prompt
+from aangan.channels.expenses.parsed_entries import (
+    ConfidenceLevel,
+    IntentClassification,
+    MessageIntent,
+    ParsedExpense,
+)
+from aangan.channels.expenses.prompts import (
+    build_expense_parse_prompt,
+    build_intent_prompt,
+    build_thread_parse_prompt,
+)
 from aangan.data.db import upsert_expense
 from aangan.data.models import Expense, ExpenseCategory, ExpenseStatus, MessageSource
 from aangan.llm import generate_json
@@ -42,6 +56,28 @@ _HOUSEHOLD_TZ = ZoneInfo("Asia/Kolkata")
 
 def _today() -> datetime.date:
     return datetime.datetime.now(_HOUSEHOLD_TZ).date()
+
+
+async def _classify_intent(text: str) -> MessageIntent:
+    """Route a message to logging vs querying. Any failure degrades to logging —
+    the safe direction, since a dropped expense is the worst outcome."""
+    try:
+        result = await generate_json(build_intent_prompt(text), IntentClassification)
+        logger.info("Intent=%s (%s)", result.intent, result.reason)
+        return result.intent
+    except Exception:
+        logger.exception("Intent classification failed; defaulting to expense logging")
+        return MessageIntent.EXPENSE_LOGGING
+
+
+async def _resolve(message: discord.Message, *emojis: str) -> None:
+    """Clear the ⏳ receipt ack and stamp the outcome reaction(s)."""
+    try:
+        await message.remove_reaction("⏳", message.guild.me)
+    except discord.HTTPException:
+        pass  # ack may not have landed; the outcome reaction still tells the story
+    for emoji in emojis:
+        await message.add_reaction(emoji)
 
 
 def _normalize_category(category: str) -> tuple[str, bool]:
@@ -113,6 +149,23 @@ class ExpensesHandler(BaseHandler):
     CHANNEL_NAME = "expenses"
 
     async def handle_message(self, message: discord.Message) -> None:
+        await message.add_reaction("⏳")  # ack on receipt; resolved once routed + handled
+        intent = await _classify_intent(message.content)
+        if intent == MessageIntent.EXPENSE_QUERY:
+            await self._handle_expense_query(message)
+        else:
+            await self._handle_expense_log(message)
+
+    async def _handle_expense_query(self, message: discord.Message) -> None:
+        # Stub: the agentic insights pipeline (spec §8.1) isn't built yet. For now we
+        # just confirm the message was routed as a query so classification is testable.
+        await _resolve(message, "📊")
+        await message.reply(
+            "I can see you're asking about spending — insight queries aren't available yet, "
+            "but they're coming soon."
+        )
+
+    async def _handle_expense_log(self, message: discord.Message) -> None:
         prompt = build_expense_parse_prompt(
             message=message.content,
             sender=message.author.display_name,
@@ -127,7 +180,7 @@ class ExpensesHandler(BaseHandler):
                 parsed.confidence,
                 parsed.clarification_question,
             )
-            await message.add_reaction("🤔")
+            await _resolve(message, "🤔")
             thread = await message.create_thread(name=message.content[:100])
             await thread.send(f"{message.author.mention} {parsed.clarification_question}")
             return
@@ -140,10 +193,9 @@ class ExpensesHandler(BaseHandler):
         )
 
         if not needs_followup:
-            await message.add_reaction("✅")
+            await _resolve(message, "✅")
         else:  # persisted, but still asking to refine the category or other soft fields
-            await message.add_reaction("✅")
-            await message.add_reaction("🤔")
+            await _resolve(message, "✅", "🤔")
             thread = await message.create_thread(name=message.content[:100])
             question = _category_clarification_question() if category_was_defaulted else parsed.clarification_question
             await thread.send(f"{message.author.mention} {question}")
