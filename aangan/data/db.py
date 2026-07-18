@@ -82,6 +82,56 @@ async def upsert_expense(expense: Expense) -> int:
         return row["id"]
 
 
+# --- Read path: untrusted, LLM-authored SQL -------------------------------
+# Everything above is the trusted write path. run_read_query is the ONE place
+# LLM-authored SQL executes (the V2 insights agent, spec §8.1). The safety
+# boundary is the read-only transaction, not the caller: any write raises
+# ReadOnlySQLTransactionError, so the worst case is a wrong number the user can
+# sanity-check, never mutated state.
+
+_STATEMENT_TIMEOUT_MS = 5000  # per-query cap; promote to Config later if needed
+_ROW_CAP = 1000               # refuse to return unbounded result sets
+
+
+class QueryResultTooLarge(Exception):
+    """Raised when a read query returns more than _ROW_CAP rows — the caller
+    should aggregate in SQL or add a LIMIT rather than pull the raw set."""
+
+
+def _validate_select_only(sql: str) -> None:
+    """Defense-in-depth so bad SQL fails with a clear message before hitting the
+    DB. The read-only transaction is the real guard; this is not a security
+    boundary on its own."""
+    stripped = sql.strip().rstrip(";").strip()
+    if not stripped:
+        raise ValueError("Empty SQL query.")
+    if ";" in stripped:  # statement stacking (asyncpg's extended protocol also blocks this)
+        raise ValueError("Multiple SQL statements are not allowed.")
+    first = stripped.split(None, 1)[0].lower()
+    if first not in ("select", "with"):
+        raise ValueError(f"Only SELECT/WITH queries are allowed, got: {first!r}")
+
+
+async def run_read_query(sql: str) -> list[dict]:
+    """Execute untrusted, LLM-authored read-only SQL and return rows as dicts.
+
+    Runs inside a READ ONLY transaction with a per-statement timeout; writes
+    raise asyncpg.exceptions.ReadOnlySQLTransactionError. SET LOCAL is scoped to
+    the transaction and reverts on commit, so the pooled connection is never
+    left altered for a later write."""
+    _validate_select_only(sql)
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await conn.execute(f"SET LOCAL statement_timeout = {_STATEMENT_TIMEOUT_MS}")
+            rows = await conn.fetch(sql)
+    if len(rows) > _ROW_CAP:
+        raise QueryResultTooLarge(
+            f"Query returned more than {_ROW_CAP} rows; aggregate in SQL or add a LIMIT."
+        )
+    return [dict(r) for r in rows]
+
+
 async def _run_migrations(pool: asyncpg.Pool) -> None:
     async with pool.acquire() as conn:
         await conn.execute("""

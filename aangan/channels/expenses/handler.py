@@ -38,6 +38,7 @@ from aangan.channels.expenses.prompts import (
 )
 from aangan.data.db import upsert_expense
 from aangan.data.models import Expense, ExpenseCategory, ExpenseStatus, MessageSource
+from aangan.insights.agent import answer as insights_answer
 from aangan.llm import generate_json
 
 logger = logging.getLogger(__name__)
@@ -157,13 +158,12 @@ class ExpensesHandler(BaseHandler):
             await self._handle_expense_log(message)
 
     async def _handle_expense_query(self, message: discord.Message) -> None:
-        # Stub: the agentic insights pipeline (spec §8.1) isn't built yet. For now we
-        # just confirm the message was routed as a query so classification is testable.
+        # Agentic insights (spec §8.1): the LLM authors read-only SQL, Postgres does the
+        # math, and narrates the answer. answer() never raises — a query error degrades to
+        # a graceful message, never a crash or a dropped entry.
+        narration = await insights_answer(message.content, _today())
         await _resolve(message, "📊")
-        await message.reply(
-            "I can see you're asking about spending — insight queries aren't available yet, "
-            "but they're coming soon."
-        )
+        await message.reply(narration)
 
     async def _handle_expense_log(self, message: discord.Message) -> None:
         prompt = build_expense_parse_prompt(
