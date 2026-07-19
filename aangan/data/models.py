@@ -20,6 +20,7 @@ class ExpenseCategory(StrEnum):
     GROCERIES = "Groceries"
     DINING = "Dining"
     TRANSPORT = "Transport"
+    INSURANCE = "Insurance"
     HEALTH = "Health/Fitness"
     MEDICAL = "Medical"
     HELP_SERVICES = "Help/Services"
