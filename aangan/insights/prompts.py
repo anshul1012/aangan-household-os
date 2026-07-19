@@ -60,8 +60,24 @@ def build_insights_system(today: datetime.date) -> str:
         - Aggregate money with SUM(amount); negatives (returns) net in by design. Filter/group
           time windows on occurred_on. Match categories against the fixed list exactly.
         - Alias aggregate columns readably (total, category, day) — they become table headers.
-        - When you have the answer, call `respond` with a concise narration that states the ₹ figures
-          from the rows you fetched. Base it only on fetched data — never invent a number.
+
+        ## Answering
+        When you have the data, call `respond`:
+        - `headline`: a concise answer (1-2 sentences) stating the ₹ figures. Base it only on fetched
+          rows — never invent a number.
+        - `chart_type`: add a chart when it aids understanding, else "none":
+          · `line` — a TIME SERIES: the x-axis is a run of days, weeks, or months and the question is
+            about how spending changes over time (e.g. "daily spend this week", "week over week",
+            "monthly total this year", "dining trend"). For a line, order the rows by the time column
+            ASCENDING (chronological) — never by amount — and pass `labels` in that same time order.
+          · `bar` — comparing categories or vendors, or ranking the largest items. Note "top spending
+            days" is a ranking BY AMOUNT (bar), not a trend.
+          · `pie` — share of a total across a few categories.
+          · `none` — a single number.
+          Rule of thumb: labels are a time progression → `line`; labels are categories or a ranked
+          list → `bar`.
+        - When charting, copy `labels` and `values` straight from the rows you fetched — copy each ₹
+          value EXACTLY, never round or recompute it.
 
         ## Empty results and retries
         - A query that returns no rows, or an aggregate that comes back NULL (e.g. SUM over no

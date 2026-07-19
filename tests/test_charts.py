@@ -21,6 +21,13 @@ def test_line_renders_png():
     assert png.startswith(_PNG_MAGIC)
 
 
+def test_pie_renders_png():
+    png = render_chart(
+        ChartSpec(kind="pie", title="Category share", labels=["Shopping", "Groceries", "Dining"], values=[4200.0, 2500.0, 950.0])
+    )
+    assert png.startswith(_PNG_MAGIC)
+
+
 def test_mismatched_labels_and_values_rejected():
     with pytest.raises(ValueError):
         ChartSpec(kind="bar", title="t", labels=["a"], values=[1.0, 2.0])

@@ -12,15 +12,23 @@ tool call every turn, so it can't pause to reason and will otherwise keep queryi
 import datetime
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from decimal import Decimal
 
 from aangan.data import run_read_query
+from aangan.insights.charts import ChartSpec, render_chart
 from aangan.insights.prompts import build_insights_system
 from aangan.llm import ToolLoopExhausted, ToolSpec, run_tool_loop
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["answer"]
+__all__ = ["answer", "InsightsAnswer"]
+
+
+@dataclass
+class InsightsAnswer:
+    text: str
+    chart_png: bytes | None = None
 
 _MAX_ROUNDS = 4
 _FALLBACK = "I couldn't work that one out — mind rephrasing?"
@@ -98,28 +106,69 @@ def _make_run_read_query_tool() -> tuple[ToolSpec, Callable]:
 
 
 def _respond_spec() -> ToolSpec:
-    """Terminal tool: the model calls this to deliver the final answer (phase 2:
-    narration only; presentation is added in phase 3)."""
+    """Terminal tool: the model delivers the answer — a headline, and optionally a
+    chart it populates by copying labels + values from the rows it fetched."""
     return ToolSpec(
         name="respond",
         description="Deliver the final answer, based only on rows you fetched.",
         parameters={
             "type": "object",
             "properties": {
-                "narration": {
+                "headline": {
                     "type": "string",
                     "description": "A concise, friendly answer (1-2 sentences). State the ₹ figures from the rows.",
-                }
+                },
+                "chart_type": {
+                    "type": "string",
+                    "enum": ["none", "bar", "line", "pie"],
+                    "description": "A chart to accompany the answer, or 'none' for a single number.",
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Chart labels (category/day/week), copied from the rows you fetched.",
+                },
+                "values": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "The ₹ amount for each label, copied EXACTLY from the rows — never rounded or computed.",
+                },
+                "chart_title": {"type": "string"},
             },
-            "required": ["narration"],
+            "required": ["headline", "chart_type"],
         },
         terminal=True,
     )
 
 
-async def answer(question: str, today: datetime.date) -> str:
-    """Resolve a spending question to a narrated answer. Never raises — any failure
-    degrades to a graceful fallback so an insights error can't crash the handler."""
+def _maybe_chart(args: dict) -> bytes | None:
+    """Render a chart from the model's respond args, or None. The model supplies
+    labels + values (copied from fetched rows); code only renders. Any shape
+    mismatch or render failure degrades to text-only — never a wrong chart."""
+    kind = args.get("chart_type")
+    if kind in (None, "none"):
+        return None
+    labels = args.get("labels") or []
+    values = args.get("values") or []
+    if not labels or len(labels) != len(values):
+        return None
+    try:
+        spec = ChartSpec(
+            kind=kind,
+            title=(args.get("chart_title") or "").strip(),
+            labels=[str(x) for x in labels],
+            values=[float(v) for v in values],
+        )
+        return render_chart(spec)
+    except Exception:  # noqa: BLE001 - a bad chart must not sink the answer
+        logger.exception("Chart render failed; answering text-only")
+        return None
+
+
+async def answer(question: str, today: datetime.date) -> InsightsAnswer:
+    """Resolve a spending question to a headline (+ optional chart). Never raises —
+    any failure degrades to a graceful fallback so an insights error can't crash the
+    handler."""
     rq_spec, rq_impl = _make_run_read_query_tool()
     tools = [rq_spec, _respond_spec()]
     try:
@@ -133,8 +182,10 @@ async def answer(question: str, today: datetime.date) -> str:
         )
     except ToolLoopExhausted:
         logger.info("Insights loop exhausted for: %s", question)
-        return _FALLBACK
+        return InsightsAnswer(text=_FALLBACK)
     except Exception:
         logger.exception("Insights agent failed for: %s", question)
-        return _FALLBACK
-    return (terminal.args.get("narration") or "").strip() or _FALLBACK
+        return InsightsAnswer(text=_FALLBACK)
+
+    text = (terminal.args.get("headline") or "").strip() or _FALLBACK
+    return InsightsAnswer(text=text, chart_png=_maybe_chart(terminal.args))
