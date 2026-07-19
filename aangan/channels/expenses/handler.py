@@ -18,6 +18,7 @@ confidence improves, until it reaches HIGH or the clarification round cap.
 """
 
 import datetime
+import io
 import logging
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -159,11 +160,15 @@ class ExpensesHandler(BaseHandler):
 
     async def _handle_expense_query(self, message: discord.Message) -> None:
         # Agentic insights (spec §8.1): the LLM authors read-only SQL, Postgres does the
-        # math, and narrates the answer. answer() never raises — a query error degrades to
-        # a graceful message, never a crash or a dropped entry.
-        narration = await insights_answer(message.content, _today())
+        # math, narrates the answer, and optionally attaches a chart. answer() never raises
+        # — a query error degrades to a graceful message, never a crash or a dropped entry.
+        result = await insights_answer(message.content, _today())
         await _resolve(message, "📊")
-        await message.reply(narration)
+        if result.chart_png:
+            chart = discord.File(io.BytesIO(result.chart_png), filename="chart.png")
+            await message.reply(result.text, file=chart)
+        else:
+            await message.reply(result.text)
 
     async def _handle_expense_log(self, message: discord.Message) -> None:
         prompt = build_expense_parse_prompt(
