@@ -250,6 +250,8 @@ class ExpensesHandler(BaseHandler):
 
         if not needs_followup:
             await thread.send("✅ Got it, logged!")
+            starter = await thread.parent.fetch_message(thread.id)
+            await starter.remove_reaction("🤔", message.guild.me)
             await thread.edit(locked=True, archived=True)
         else:
             if at_limit:
