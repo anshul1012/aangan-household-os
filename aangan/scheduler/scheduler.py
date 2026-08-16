@@ -1,10 +1,11 @@
 """Generic in-process job scheduler (tech.md §7).
 
-A "scheduled job" = a recurring CronTrigger + a period-of-interest resolver +
-a report builder + a target channel. A new job (e.g. the future monthly
-report) is added by writing one `build_job(config) -> ScheduledJob` factory
-elsewhere and registering it in _build_jobs() below — nothing else here
-changes.
+A "scheduled job" = a recurring CronTrigger + a builder + a target channel.
+A job that cares about a reporting period (e.g. the weekly summary) resolves
+it itself inside its own build() closure — the scheduler has no notion of
+periods. A new job (e.g. the future monthly report) is added by writing one
+`build_job(config) -> ScheduledJob` factory elsewhere and registering it in
+_build_jobs() below — nothing else here changes.
 
 Restart-safety: the schedule itself needs no persistence. Every process
 start re-registers the same CronTriggers identically from code, so a
@@ -21,16 +22,14 @@ import io
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import date, datetime
 
 import discord
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from aangan.config.config import Config
-from aangan.insights.answer import InsightsAnswer
+from aangan.insights.answer import ChannelMessage
 from aangan.timeutil import HOUSEHOLD_TZ
-from aangan.timeutil import now as _now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +40,7 @@ __all__ = ["ScheduledJob", "init_scheduler", "shutdown_scheduler"]
 class ScheduledJob:
     name: str  # stable id, used for logging
     trigger: CronTrigger
-    period_for: Callable[[datetime], tuple[date, date]]  # now -> (period_start, period_end)
-    build: Callable[[date, date], Awaitable[InsightsAnswer]]
+    build: Callable[[], Awaitable[ChannelMessage]]
     channel_id: int
 
 
@@ -50,36 +48,30 @@ _scheduler: AsyncIOScheduler | None = None
 
 
 async def _execute(client: discord.Client, job: ScheduledJob) -> None:
-    """Build and post one job's most-recently-completed period."""
-    period_start, period_end = job.period_for(_now_ist())
-
+    """Build and post one job's message."""
     try:
-        answer = await job.build(period_start, period_end)
+        message = await job.build()
     except Exception:
-        logger.exception(
-            "Job %s: failed to build report for %s to %s", job.name, period_start, period_end,
-        )
+        logger.exception("Job %s: failed to build message", job.name)
         return
 
     try:
         channel = client.get_channel(job.channel_id) or await client.fetch_channel(job.channel_id)
-        file = discord.File(io.BytesIO(answer.chart_png), filename="chart.png") if answer.chart_png else None
+        file = discord.File(io.BytesIO(message.chart_png), filename="chart.png") if message.chart_png else None
         # @everyone so the household is notified regardless of who's online —
         # needs the bot role's "Mention @everyone" permission in the server,
         # or this silently posts without pinging anyone. allowed_mentions is
         # explicit so the ping survives any future stricter default elsewhere.
         await channel.send(
-            "@everyone\n" + answer.text,
+            "@everyone\n" + message.text,
             file=file,
             allowed_mentions=discord.AllowedMentions(everyone=True),
         )
     except Exception:
-        logger.exception(
-            "Job %s: built report for %s to %s but failed to post", job.name, period_start, period_end,
-        )
+        logger.exception("Job %s: built message but failed to post", job.name)
         return
 
-    logger.info("Job %s: posted report for %s to %s", job.name, period_start, period_end)
+    logger.info("Job %s: posted", job.name)
 
 
 def _build_jobs(config: Config) -> list[ScheduledJob]:
@@ -88,7 +80,8 @@ def _build_jobs(config: Config) -> list[ScheduledJob]:
     # import build_job as build_monthly_job) — nothing else in this module
     # changes.
     from aangan.insights.weekly_report import build_job as build_weekly_job
-    return [build_weekly_job(config)]
+    from aangan.scheduler.reminder import build_job as build_reminder_job
+    return [build_weekly_job(config), build_reminder_job(config)]
 
 
 async def init_scheduler(config: Config, client: discord.Client) -> None:

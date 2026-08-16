@@ -20,6 +20,7 @@ class Config:
     database_url: str | None = None  # prod (Supabase): takes priority over db_user/db_password/db_name
     allowed_channel_ids: frozenset[int] = field(default_factory=frozenset)  # this bot instance only reacts here
     insights_channel_id: int = 0  # push-only destination for scheduled weekly/monthly reports (spec §8.2/§9)
+    expenses_channel_id: int = 0  # push destination for the nightly unlogged-expense reminder
 
 
 def load_config() -> Config:
@@ -53,6 +54,14 @@ def load_config() -> Config:
             f"INSIGHTS_CHANNEL_ID must be a single Discord channel ID, got: {raw_insights_channel_id!r}"
         ) from e
 
+    raw_expenses_channel_id = require("EXPENSES_CHANNEL_ID")
+    try:
+        expenses_channel_id = int(raw_expenses_channel_id)
+    except ValueError as e:
+        raise RuntimeError(
+            f"EXPENSES_CHANNEL_ID must be a single Discord channel ID, got: {raw_expenses_channel_id!r}"
+        ) from e
+
     return Config(
         bot_token=require("BOT_TOKEN"),
         gemini_api_key=require("GEMINI_API_KEY"),
@@ -64,4 +73,5 @@ def load_config() -> Config:
         database_url=database_url,
         allowed_channel_ids=allowed_channel_ids,
         insights_channel_id=insights_channel_id,
+        expenses_channel_id=expenses_channel_id,
     )

@@ -15,14 +15,14 @@ from collections.abc import Callable
 from decimal import Decimal
 
 from aangan.data import run_read_query
-from aangan.insights.answer import InsightsAnswer
+from aangan.insights.answer import ChannelMessage
 from aangan.insights.charts import ChartSpec, render_chart
 from aangan.insights.prompts import build_insights_system
 from aangan.llm import ToolLoopExhausted, ToolSpec, run_tool_loop
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["answer", "InsightsAnswer"]
+__all__ = ["answer", "ChannelMessage"]
 
 _MAX_ROUNDS = 4
 _FALLBACK = "I couldn't work that one out — mind rephrasing?"
@@ -159,7 +159,7 @@ def _maybe_chart(args: dict) -> bytes | None:
         return None
 
 
-async def answer(question: str, today: datetime.date) -> InsightsAnswer:
+async def answer(question: str, today: datetime.date) -> ChannelMessage:
     """Resolve a spending question to a headline (+ optional chart). Never raises —
     any failure degrades to a graceful fallback so an insights error can't crash the
     handler."""
@@ -176,10 +176,10 @@ async def answer(question: str, today: datetime.date) -> InsightsAnswer:
         )
     except ToolLoopExhausted:
         logger.info("Insights loop exhausted for: %s", question)
-        return InsightsAnswer(text=_FALLBACK)
+        return ChannelMessage(text=_FALLBACK)
     except Exception:
         logger.exception("Insights agent failed for: %s", question)
-        return InsightsAnswer(text=_FALLBACK)
+        return ChannelMessage(text=_FALLBACK)
 
     text = (terminal.args.get("headline") or "").strip() or _FALLBACK
-    return InsightsAnswer(text=text, chart_png=_maybe_chart(terminal.args))
+    return ChannelMessage(text=text, chart_png=_maybe_chart(terminal.args))

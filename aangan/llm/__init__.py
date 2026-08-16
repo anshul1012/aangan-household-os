@@ -3,6 +3,7 @@ from .gemini import (
     ToolLoopExhausted,
     ToolSpec,
     generate_json,
+    generate_text,
     init_gemini,
     run_tool_loop,
 )
@@ -10,6 +11,7 @@ from .gemini import (
 __all__ = [
     "init_gemini",
     "generate_json",
+    "generate_text",
     "run_tool_loop",
     "ToolSpec",
     "ToolCall",

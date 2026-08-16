@@ -1,7 +1,8 @@
 """Gemini API client.
 
-Two usage patterns behind one swappable module:
+Three usage patterns behind one swappable module:
 - generate_json(prompt, schema) → validated Pydantic object (single-shot; the logging parser).
+- generate_text(prompt) → freeform string (single-shot; e.g. the reminder job).
 - run_tool_loop(...) → a bounded function-calling loop (the insights agent, spec §8.1).
 Call init_gemini() at startup; swap the model via GEMINI_MODEL in .env.
 """
@@ -44,6 +45,15 @@ async def generate_json(prompt: str, schema: type[T]) -> T:
         ),
     )
     return schema.model_validate_json(response.text)
+
+
+async def generate_text(prompt: str) -> str:
+    """Send prompt to Gemini and return freeform text — no schema constraint."""
+    if _client is None:
+        raise RuntimeError("Call init_gemini() before generate_text().")
+
+    response = await _client.aio.models.generate_content(model=_model, contents=prompt)
+    return response.text
 
 
 # --- Function-calling loop (insights agent, spec §8.1) --------------------

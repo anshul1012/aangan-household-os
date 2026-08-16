@@ -12,10 +12,11 @@ from apscheduler.triggers.cron import CronTrigger
 
 from aangan.config.config import Config
 from aangan.data.db import fetch_category_totals
-from aangan.insights.answer import InsightsAnswer
+from aangan.insights.answer import ChannelMessage
 from aangan.insights.charts import ChartSpec, render_chart
 from aangan.scheduler.scheduler import ScheduledJob
 from aangan.timeutil import HOUSEHOLD_TZ
+from aangan.timeutil import now as _now_ist
 
 __all__ = ["build_job"]
 
@@ -37,7 +38,8 @@ def _fmt_date(d: datetime.date) -> str:
     return d.strftime("%d %b")
 
 
-async def _build(period_start: datetime.date, period_end: datetime.date) -> InsightsAnswer:
+async def _build() -> ChannelMessage:
+    period_start, period_end = _prior_week(_now_ist())
     rows = await fetch_category_totals(period_start, period_end)
     # Highest spend first — a summary is scanned top-to-bottom by a human, so
     # amount-descending is the useful order here. This deliberately deviates
@@ -52,7 +54,7 @@ async def _build(period_start: datetime.date, period_end: datetime.date) -> Insi
         # Empty week, or a week that net-zeroed out (e.g. spend fully offset
         # by a same-week reimbursement) — skip the % breakdown (0/0) and the
         # chart (ChartSpec requires >=1 data point).
-        return InsightsAnswer(text=f"{header}\nNo net spend logged this week.")
+        return ChannelMessage(text=f"{header}\nNo net spend logged this week.")
 
     lines = [header, f"Total: ₹{total:,.0f} net of reimbursements", ""]
     for r in rows:
@@ -65,14 +67,13 @@ async def _build(period_start: datetime.date, period_end: datetime.date) -> Insi
         labels=[r.category for r in rows],
         values=[float(r.total) for r in rows],
     ))
-    return InsightsAnswer(text="\n".join(lines), chart_png=chart)
+    return ChannelMessage(text="\n".join(lines), chart_png=chart)
 
 
 def build_job(config: Config) -> ScheduledJob:
     return ScheduledJob(
         name=JOB_NAME,
         trigger=CronTrigger(day_of_week="mon", hour=10, minute=0, timezone=HOUSEHOLD_TZ),
-        period_for=_prior_week,
         build=_build,
         channel_id=config.insights_channel_id,
     )
