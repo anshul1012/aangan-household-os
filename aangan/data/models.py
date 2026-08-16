@@ -86,3 +86,14 @@ class CategoryTotal:
     jobs, aangan.data.db.fetch_category_totals)."""
     category: str                          # one of ExpenseCategory; TEXT in DB
     total: Decimal                         # net of reimbursements — SUM folds negatives in
+
+
+@dataclass
+class TopExpense:
+    """One individual expense row, for "biggest expenses this period" report
+    sections (aangan.data.db.fetch_top_expenses). Positive amounts only —
+    reimbursements/returns aren't "expenses" in this listing's sense."""
+    amount: Decimal
+    category: str                          # one of ExpenseCategory; TEXT in DB
+    raw_text: str
+    occurred_on: datetime.date
