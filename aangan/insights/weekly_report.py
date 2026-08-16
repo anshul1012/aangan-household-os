@@ -1,8 +1,8 @@
 """Weekly spend summary — the first job riding aangan.scheduler.
 
-Deliberately slim per spec §8.2: total + per-category amount/% share + one
-category-breakdown bar chart. No trend/anomaly analysis at weekly grain —
-that's monthly-only (deferred, spec §8.3).
+Deliberately slim per spec §8.2: total + per-category amount/% share + top 5
+individual expenses + one category-breakdown bar chart. No trend/anomaly
+analysis at weekly grain — that's monthly-only (deferred, spec §8.3).
 """
 
 import datetime
@@ -11,7 +11,8 @@ from decimal import Decimal
 from apscheduler.triggers.cron import CronTrigger
 
 from aangan.config.config import Config
-from aangan.data.db import fetch_category_totals
+from aangan.data.db import fetch_category_totals, fetch_top_expenses
+from aangan.data.models import TopExpense
 from aangan.insights.answer import ChannelMessage
 from aangan.insights.charts import ChartSpec, render_chart
 from aangan.scheduler.scheduler import ScheduledJob
@@ -38,6 +39,11 @@ def _fmt_date(d: datetime.date) -> str:
     return d.strftime("%d %b")
 
 
+def _fmt_top_expense(e: TopExpense) -> str:
+    text = e.raw_text if len(e.raw_text) <= 60 else e.raw_text[:57] + "..."
+    return f"₹{e.amount:,.0f}  {e.category} — {text} ({_fmt_date(e.occurred_on)})"
+
+
 async def _build() -> ChannelMessage:
     period_start, period_end = _prior_week(_now_ist())
     rows = await fetch_category_totals(period_start, period_end)
@@ -60,6 +66,11 @@ async def _build() -> ChannelMessage:
     for r in rows:
         share = r.total / total * 100
         lines.append(f"{r.category:<16} ₹{r.total:,.0f}  ({share:.1f}%)")
+
+    top_expenses = await fetch_top_expenses(period_start, period_end)
+    if top_expenses:
+        lines += ["", "Top 5 expenses this week:"]
+        lines += [_fmt_top_expense(e) for e in top_expenses]
 
     chart = render_chart(ChartSpec(
         kind="bar",

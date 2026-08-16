@@ -12,7 +12,7 @@ from pathlib import Path
 import asyncpg
 
 from aangan.config.config import Config
-from aangan.data.models import CategoryTotal, Expense
+from aangan.data.models import CategoryTotal, Expense, TopExpense
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,31 @@ async def fetch_category_totals(
             period_start, period_end,
         )
     return [CategoryTotal(category=r["category"], total=r["total"]) for r in rows]
+
+
+async def fetch_top_expenses(
+    period_start: datetime.date, period_end: datetime.date, limit: int = 5
+) -> list[TopExpense]:
+    """The `limit` largest individual positive expenses for occurred_on in
+    [period_start, period_end], inclusive. Reimbursements/returns (amount <= 0)
+    are excluded — this lists outflows, not net category totals (see
+    fetch_category_totals for that). Trusted, code-authored SQL."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT amount, category, raw_text, occurred_on
+            FROM expenses
+            WHERE occurred_on BETWEEN $1 AND $2 AND amount > 0
+            ORDER BY amount DESC
+            LIMIT $3
+            """,
+            period_start, period_end, limit,
+        )
+    return [
+        TopExpense(amount=r["amount"], category=r["category"], raw_text=r["raw_text"], occurred_on=r["occurred_on"])
+        for r in rows
+    ]
 
 
 # --- Read path: untrusted, LLM-authored SQL -------------------------------
