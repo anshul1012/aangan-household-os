@@ -16,7 +16,7 @@ class Config:
     db_password: str = ""
     db_name: str = ""
     db_host: str = "db"   # matches the compose service name; override for local non-Docker dev
-    gemini_model: str = "gemini-2.0-flash"  # override via GEMINI_MODEL; update when model is deprecated
+    gemini_model: str = "gemini-3.5-flash-lite"  # override via GEMINI_MODEL; update when model is deprecated
     database_url: str | None = None  # prod (Supabase): takes priority over db_user/db_password/db_name
     allowed_channel_ids: frozenset[int] = field(default_factory=frozenset)  # this bot instance only reacts here
     insights_channel_id: int = 0  # push-only destination for scheduled weekly/monthly reports (spec §8.2/§9)
@@ -60,7 +60,7 @@ def load_config() -> Config:
         db_password=db_password,
         db_name=db_name,
         db_host=os.environ.get("POSTGRES_HOST", "db"),
-        gemini_model=os.environ.get("GEMINI_MODEL", "gemini-2.0-flash"),
+        gemini_model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
         database_url=database_url,
         allowed_channel_ids=allowed_channel_ids,
         insights_channel_id=insights_channel_id,
