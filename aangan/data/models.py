@@ -78,3 +78,11 @@ class KnownAccount:
     canonical_name: str
     id: int | None = None
     updated_at: datetime.datetime | None = None
+
+
+@dataclass
+class CategoryTotal:
+    """Net spend for one category over a report period (scheduled report
+    jobs, aangan.data.db.fetch_category_totals)."""
+    category: str                          # one of ExpenseCategory; TEXT in DB
+    total: Decimal                         # net of reimbursements — SUM folds negatives in
