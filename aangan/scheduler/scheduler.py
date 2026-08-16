@@ -64,7 +64,15 @@ async def _execute(client: discord.Client, job: ScheduledJob) -> None:
     try:
         channel = client.get_channel(job.channel_id) or await client.fetch_channel(job.channel_id)
         file = discord.File(io.BytesIO(answer.chart_png), filename="chart.png") if answer.chart_png else None
-        await channel.send(answer.text, file=file)
+        # @everyone so the household is notified regardless of who's online —
+        # needs the bot role's "Mention @everyone" permission in the server,
+        # or this silently posts without pinging anyone. allowed_mentions is
+        # explicit so the ping survives any future stricter default elsewhere.
+        await channel.send(
+            "@everyone\n" + answer.text,
+            file=file,
+            allowed_mentions=discord.AllowedMentions(everyone=True),
+        )
     except Exception:
         logger.exception(
             "Job %s: built report for %s to %s but failed to post", job.name, period_start, period_end,
