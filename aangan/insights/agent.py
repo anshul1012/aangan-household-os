@@ -12,10 +12,10 @@ tool call every turn, so it can't pause to reason and will otherwise keep queryi
 import datetime
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from decimal import Decimal
 
 from aangan.data import run_read_query
+from aangan.insights.answer import InsightsAnswer
 from aangan.insights.charts import ChartSpec, render_chart
 from aangan.insights.prompts import build_insights_system
 from aangan.llm import ToolLoopExhausted, ToolSpec, run_tool_loop
@@ -23,12 +23,6 @@ from aangan.llm import ToolLoopExhausted, ToolSpec, run_tool_loop
 logger = logging.getLogger(__name__)
 
 __all__ = ["answer", "InsightsAnswer"]
-
-
-@dataclass
-class InsightsAnswer:
-    text: str
-    chart_png: bytes | None = None
 
 _MAX_ROUNDS = 4
 _FALLBACK = "I couldn't work that one out — mind rephrasing?"

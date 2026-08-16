@@ -5,13 +5,14 @@ Only connection management and migrations live here for now; query functions
 are added as features need them.
 """
 
+import datetime
 import logging
 from pathlib import Path
 
 import asyncpg
 
 from aangan.config.config import Config
-from aangan.data.models import Expense
+from aangan.data.models import CategoryTotal, Expense
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,30 @@ async def upsert_expense(expense: Expense) -> int:
             expense.confidence, expense.status, expense.source_message_id,
         )
         return row["id"]
+
+
+async def fetch_category_totals(
+    period_start: datetime.date, period_end: datetime.date
+) -> list[CategoryTotal]:
+    """Net spend per category for occurred_on in [period_start, period_end],
+    inclusive — net of reimbursements/returns (negative entries fold into
+    SUM by construction, spec §8). A category with zero net spend across the
+    period (e.g. fully reimbursed) is simply absent from the result, not a
+    zero-valued row — GROUP BY only returns groups with >=1 matching row.
+    Trusted, code-authored SQL — distinct from run_read_query below, which is
+    reserved for untrusted LLM-authored SQL."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT category, SUM(amount) AS total
+            FROM expenses
+            WHERE occurred_on BETWEEN $1 AND $2
+            GROUP BY category
+            """,
+            period_start, period_end,
+        )
+    return [CategoryTotal(category=r["category"], total=r["total"]) for r in rows]
 
 
 # --- Read path: untrusted, LLM-authored SQL -------------------------------

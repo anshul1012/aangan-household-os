@@ -21,7 +21,6 @@ import datetime
 import io
 import logging
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 import discord
 
@@ -41,6 +40,7 @@ from aangan.data.db import upsert_expense
 from aangan.data.models import Expense, ExpenseCategory, ExpenseStatus, MessageSource
 from aangan.insights.agent import answer as insights_answer
 from aangan.llm import generate_json
+from aangan.timeutil import today as _today
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +49,6 @@ _THREAD_HISTORY_FETCH_LIMIT = 50  # Discord history page size; independent of th
 
 _VALID_CATEGORIES = {c.value for c in ExpenseCategory}
 _CATEGORY_LIST = ", ".join(c.value for c in ExpenseCategory)
-
-# The household is IST-based; "today" must resolve to the household's local
-# calendar date regardless of the container's own timezone (Docker defaults to
-# UTC), since occurred_on/"yesterday" resolution and all reports key off it.
-_HOUSEHOLD_TZ = ZoneInfo("Asia/Kolkata")
-
-
-def _today() -> datetime.date:
-    return datetime.datetime.now(_HOUSEHOLD_TZ).date()
 
 
 async def _classify_intent(text: str) -> MessageIntent:
@@ -250,6 +241,8 @@ class ExpensesHandler(BaseHandler):
 
         if not needs_followup:
             await thread.send("✅ Got it, logged!")
+            starter = await thread.parent.fetch_message(thread.id)
+            await starter.remove_reaction("🤔", message.guild.me)
             await thread.edit(locked=True, archived=True)
         else:
             if at_limit:

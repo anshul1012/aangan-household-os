@@ -10,8 +10,6 @@ GEMINI_API_KEY). Seed some expenses first, or answers will read "nothing recorde
 """
 
 import asyncio
-import datetime
-from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -19,6 +17,7 @@ from aangan.config import load_config
 from aangan.data.db import close_db, init_db
 from aangan.insights.agent import answer
 from aangan.llm import init_gemini
+from aangan.timeutil import today as _today
 
 QUESTIONS = [
     "how much did we spend last week?",
@@ -37,7 +36,7 @@ async def main() -> None:
     config = load_config()
     init_gemini(config.gemini_api_key, config.gemini_model)
     await init_db(config)
-    today = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    today = _today()
     try:
         for q in QUESTIONS:
             print("\n" + "=" * 78)
